@@ -23,7 +23,9 @@
 
 	"importOrder": [
 		"<THIRD_PARTY_MODULES>",
+		"^\\$env/(?!.*(sc|sa|c)ss)",
 		"^\\$app/(?!.*(sc|sa|c)ss)",
+		"^\\$lib/(?!.*(sc|sa|c)ss)",
 		"^\\$(?!.*)/(?!.*(sc|sa|c)ss)",
 		"^@pages/(?!.*(sc|sa|c)ss)",
 		"^@widgets/(?!.*(sc|sa|c)ss)",
