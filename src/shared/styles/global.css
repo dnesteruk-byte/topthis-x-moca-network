@@ -1,6 +1,31 @@
 @import "tailwindcss";
 
+@theme {
+	--color-mvp-base-light: #fbfbfb;
+	--color-mvp-off-white: #e3e3e4;
+	--color-mvp-base-dark: #11091a;
+	--color-mvp-off-black: #2d2a31;
+	--color-mvp-dark-shading: #211d26;
+
+	--color-mvp-golden: #ffd83a;
+	--color-mvp-red: #eb3247;
+	--color-mvp-indigo: #3e41f4;
+	--color-mvp-pink: #ffb5f0;
+}
+
+@layer components {
+	.button {
+		@apply flex h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-mvp-off-white bg-mvp-base-dark px-6 py-2 font-bold text-mvp-base-light transition-all duration-150 hover:bg-mvp-base-light hover:text-mvp-base-dark disabled:cursor-not-allowed disabled:opacity-70;
+	}
+
+	.error-text {
+		@apply text-base font-semibold text-red-500;
+	}
+}
+
 html,
 body {
-	@apply bg-slate-900 text-gray-200;
+	font-family: "DM Sans", sans-serif;
+
+	@apply bg-mvp-off-black text-mvp-base-light;
 }

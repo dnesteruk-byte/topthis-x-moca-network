@@ -1,5 +1,8 @@
-import { Air3Service, type Air3User } from "$lib/server/services/air3";
 import { type RequestHandler } from "@sveltejs/kit";
+
+import { Air3Service, type Air3User } from "$lib/server/services/air3";
+
+import { Air3AuthStatus } from "@shared/constants/auth-status";
 
 export const POST: RequestHandler = async ({ request }) => {
 	const authorization = request.headers.get("Authorization");
@@ -10,21 +13,27 @@ export const POST: RequestHandler = async ({ request }) => {
 		return Response.json("Invalid creadentials", { status: 401 });
 	}
 
-	// TODO: Verify Moca Network token
-
 	const airService = new Air3Service();
+
+	// Token verifying
+	await airService.verifyAir3Token(token);
 
 	// Trying to authorise an user
 	const { success, data, error } = await airService.authorizeUser(user);
 
-	// Authorized success
-	if (success && data) {
-		return Response.json(data, { status: 200 });
-	}
-
 	// Authorization failed
 	if (error) {
 		return error;
+	}
+
+	const { data: userData } = await airService.getUser(data?.access as string);
+
+	// Authorized success
+	if (success && data && userData) {
+		return Response.json(
+			{ ...data, status: userData!.air3Role ? Air3AuthStatus.Verified : Air3AuthStatus.New },
+			{ status: 200 }
+		);
 	}
 
 	// User doesn't exists. Trying to create
@@ -44,7 +53,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	// Authorized success
 	if (authSuccess && authData) {
-		return Response.json(authData, { status: 200 });
+		return Response.json({ ...authData, status: Air3AuthStatus.New }, { status: 200 });
 	}
 
 	// Authorization failed

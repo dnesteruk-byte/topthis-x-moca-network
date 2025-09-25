@@ -1,6 +1,13 @@
-import { env } from "$env/dynamic/private";
 import AWS from "aws-sdk";
+import jwt, { type GetPublicKeyOrSecret } from "jsonwebtoken";
+import { JwksClient } from "jwks-rsa";
 import { MongoClient } from "mongodb";
+
+import { env } from "$env/dynamic/private";
+import { env as publicEnv } from "$env/dynamic/public";
+
+import type { Air3UserRole } from "@shared/constants/role";
+import { isDevEnv } from "@shared/utils/env";
 
 export type Air3User = {
 	email: string;
@@ -41,6 +48,12 @@ const AuthorizationError = () => ({
 });
 
 export class Air3Service {
+	// Air3 vars
+	private jwksUri = env.SECRET_AIR3_JWKS;
+	private jwks = new JwksClient({
+		jwksUri: this.jwksUri,
+	});
+
 	// AWS vars
 	private region = env.SECRET_AWS_COGNITO_REGION;
 	private userPoolId = env.SECRET_AWS_COGNITO_USER_POOL_ID;
@@ -61,8 +74,40 @@ export class Air3Service {
 		},
 	});
 
+	private getKey: GetPublicKeyOrSecret = async (header, callback) => {
+		try {
+			const key = await this.jwks.getSigningKey(header.kid);
+			const signingKey = key.getPublicKey();
+			callback(null, signingKey);
+		} catch (error) {
+			callback(error as Error);
+		}
+	};
+
+	public verifyAir3Token = async (token: string) => {
+		if (isDevEnv()) {
+			return Success(jwt.decode(token) as { sub: string });
+		}
+
+		try {
+			const data = (await new Promise((resolve, reject) => {
+				jwt.verify(token, this.getKey, {}, (err, decoded) => {
+					if (err) {
+						reject(new Error(`Token verification failed: ${err.message}`));
+					} else {
+						resolve(decoded as { sub: string });
+					}
+				});
+			})) as { sub: string };
+
+			return Success(data);
+		} catch (error) {
+			console.error("Failed to verify Air3 token. ", { error });
+			return AuthorizationError();
+		}
+	};
+
 	public authorizeUser = async (user: Air3User) => {
-		console.log({ this: this });
 		try {
 			const authResult = await this.cognito
 				.adminInitiateAuth({
@@ -101,6 +146,38 @@ export class Air3Service {
 			}
 
 			return Success(null);
+		}
+	};
+
+	public getUser = async (token: string) => {
+		if (!token) {
+			return AuthorizationError();
+		}
+
+		const { error, data } = await this.verifyAir3Token(token);
+
+		if (error) {
+			return AuthorizationError();
+		}
+
+		let mongoClient: MongoClient | null = null;
+
+		try {
+			mongoClient = new MongoClient(this.dbUrl);
+
+			const db = mongoClient.db(this.dbName);
+			const users = db.collection("users");
+
+			const mongoUser = await users.findOne({
+				cognitoSub: data!.sub,
+			});
+
+			return Success(mongoUser);
+		} catch (error) {
+			console.error({ error });
+			return InternalServerError();
+		} finally {
+			mongoClient?.close();
 		}
 	};
 
@@ -164,7 +241,7 @@ export class Air3Service {
 				email,
 				name: null,
 				stagename: null,
-				profileImageUrl: null,
+				profileImageUrl: `${publicEnv.PUBLIC_API_URL}/dev/images/user.jpg`,
 				phoneNumber: null,
 				pronouns: null,
 				town: null,
@@ -180,10 +257,54 @@ export class Air3Service {
 				version: 0.5,
 				status: "new",
 				signInType: "air3",
-				biography: "No Bio yet",
+				biography: "No bio yet",
+				air3Role: null,
 			});
 
 			return Success(mongoUser.insertedId.toString());
+		} catch (error) {
+			console.error({ error });
+			return InternalServerError();
+		} finally {
+			mongoClient?.close();
+		}
+	};
+
+	public addRole = async (token: string, role: Air3UserRole) => {
+		if (!token) {
+			return AuthorizationError();
+		}
+
+		const tokenVerifyingResult = await this.verifyAir3Token(token);
+
+		if (tokenVerifyingResult.error) {
+			return tokenVerifyingResult;
+		}
+
+		let mongoClient: MongoClient | null = null;
+
+		try {
+			mongoClient = new MongoClient(this.dbUrl);
+
+			const db = mongoClient.db(this.dbName);
+			const users = db.collection("users");
+
+			const mongoUser = await users.updateOne(
+				{ cognitoSub: tokenVerifyingResult.data.sub },
+				{
+					$set: {
+						air3Role: role,
+					},
+				}
+			);
+
+			const m = await users.findOne({
+				cognitoSub: tokenVerifyingResult.data.sub,
+			});
+
+			console.log({ m });
+
+			return Success(mongoUser.upsertedId?.toString());
 		} catch (error) {
 			console.error({ error });
 			return InternalServerError();

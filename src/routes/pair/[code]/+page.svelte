@@ -8,7 +8,10 @@
 	import { resolve } from "$app/paths";
 	import { page } from "$app/state";
 
+	import Spinner from "@shared/assets/icons/spinner.svelte";
+	import { Air3AuthStatus } from "@shared/constants/auth-status";
 	import { httpClient } from "@shared/http-client";
+	import { isDevEnv } from "@shared/utils/env";
 
 	/* States */
 	let pending = $state(false);
@@ -25,7 +28,7 @@
 	const init = async () => {
 		try {
 			await airService.init({
-				buildEnv: BUILD_ENV.SANDBOX,
+				buildEnv: isDevEnv() ? BUILD_ENV.SANDBOX : BUILD_ENV.PRODUCTION,
 				enableLogging: true,
 				skipRehydration: true,
 			});
@@ -41,6 +44,7 @@
 			const result = await airService.login();
 			const info = await airService.getUserInfo();
 
+			// Create or authorize an user
 			const { data } = await httpClient.post("/api/auth/air-kit", info.user, {
 				baseURL: env.PUBLIC_APP_URL,
 				headers: {
@@ -48,6 +52,14 @@
 				},
 			});
 
+			// Redirect an user if it's new one
+			if (data.status === Air3AuthStatus.New) {
+				localStorage.setItem("auth", JSON.stringify(data));
+				await goto(resolve(`/pair/${code}/role`));
+				return;
+			}
+
+			// Pair TV device
 			await httpClient.post(
 				"/v1/pair",
 				{ code },
@@ -68,17 +80,15 @@
 	});
 </script>
 
-{#if code}
-	<button
-		class={[
-			"cursor-pointer rounded-lg bg-orange-500 px-6 py-2 text-white",
-			"disabled:cursor-not-allowed disabled:opacity-70",
-		]}
-		onclick={login}
-		disabled={airKitInitializing || pending}
-	>
-		Continue with Airkit
-	</button>
-{:else}
-	<p class="text-center text-lg font-semibold text-red-500">Wrong pairing code</p>
-{/if}
+<div class="flex max-w-md flex-col items-center justify-center gap-8">
+	{#if code}
+		<button class="button" onclick={login} disabled={airKitInitializing || pending}>
+			{#if pending || airKitInitializing}
+				<Spinner aria-hidden class="size-6 animate-spin text-mvp-red" />
+			{/if}
+			Continue with AIR Kit
+		</button>
+	{:else}
+		<p class="error-text text-center">Wrong pairing code</p>
+	{/if}
+</div>
