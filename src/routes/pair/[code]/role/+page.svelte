@@ -47,13 +47,14 @@
 	};
 </script>
 
-{#snippet radio(value: Air3UserRole, label: string)}
+{#snippet radio(value: Air3UserRole, label: string, disabled?: boolean)}
 	{@const selected = value === role}
 
 	<label
 		for={value}
 		class={[
-			"flex w-full cursor-pointer items-center justify-start gap-2 border-b border-mvp-base-light/30 py-3 transition-all",
+			"flex w-full  items-center justify-start gap-2 border-b border-mvp-base-light/30 py-3 transition-all",
+			disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer",
 		]}
 	>
 		<!-- Indicator -->
@@ -68,7 +69,7 @@
 		<span class="text-base font-medium">{label}</span>
 
 		<!-- Input -->
-		<input class="sr-only" id={value} bind:group={role} {value} type="radio" />
+		<input class="sr-only" id={value} bind:group={role} {disabled} {value} type="radio" />
 	</label>
 {/snippet}
 
@@ -76,16 +77,16 @@
 	<p class="text-center text-xl font-semibold">Choose the role that mostly fits your experience</p>
 
 	<div class="flex w-full flex-col gap-4">
-		{@render radio(Air3UserRole.Fan, "I'm mostly a fan")}
-		{@render radio(Air3UserRole.Creator, "I'm mostly a creator")}
-		{@render radio(Air3UserRole.FanAndCreator, "I'm a fan and a creator")}
+		{@render radio(Air3UserRole.Fan, "I'm mostly a fan", pending)}
+		{@render radio(Air3UserRole.Creator, "I'm mostly a creator", pending)}
+		{@render radio(Air3UserRole.FanAndCreator, "I'm a fan and a creator", pending)}
 	</div>
 
 	{#if error}
 		<p class="error-text text-center">{error}</p>
 	{/if}
 
-	<button class="button" onclick={addRole} disabled={!role}>
+	<button class="button" onclick={addRole} disabled={!role || pending}>
 		{#if pending}
 			<Spinner aria-hidden class="size-6 animate-spin text-mvp-red" />
 		{/if}
