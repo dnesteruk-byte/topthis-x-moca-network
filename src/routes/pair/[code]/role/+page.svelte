@@ -78,7 +78,7 @@
 	<div class="flex w-full flex-col gap-4">
 		{@render radio(Air3UserRole.Fan, "I'm mostly a fan")}
 		{@render radio(Air3UserRole.Creator, "I'm mostly a creator")}
-		{@render radio(Air3UserRole.FanAndCreator, "I'm mostly a fan and creator")}
+		{@render radio(Air3UserRole.FanAndCreator, "I'm a fan and a creator")}
 	</div>
 
 	{#if error}
